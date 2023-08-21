@@ -14,6 +14,7 @@ import org.apache.flink.util.Collector;
 import java.sql.Timestamp;
 import java.time.Duration;
 
+//滚动窗口统计pv
 public class WaterMarksDemo3 {
     public static void main(String[] args) throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();

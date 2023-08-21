@@ -1,19 +1,20 @@
 package com.tqy.waterMarks;
 
 import org.apache.flink.api.common.eventtime.SerializableTimestampAssigner;
+import org.apache.flink.api.common.eventtime.TimestampAssignerSupplier;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
-import org.apache.flink.streaming.api.functions.ProcessFunction;
+import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
+import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
+import org.apache.flink.streaming.api.windowing.time.Time;
+import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.util.Collector;
 
-import java.sql.Timestamp;
 import java.time.Duration;
 
-//水位线加定时器
-public class WaterMarksDemo2 {
+public class WaterMarksDemo6 {
     public static void main(String[] args) throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
@@ -29,31 +30,24 @@ public class WaterMarksDemo2 {
                         return tuple2;
                     }
                 })
-
                 .assignTimestampsAndWatermarks(
                         WatermarkStrategy.<Tuple2<String,Long>>forBoundedOutOfOrderness(Duration.ofSeconds(5))
-                        .withTimestampAssigner(new SerializableTimestampAssigner<Tuple2<String,Long>>() {
+                        .withTimestampAssigner(new SerializableTimestampAssigner<Tuple2<String, Long>>() {
                             @Override
                             public long extractTimestamp(Tuple2<String, Long> element, long recordTimestamp) {
                                 return element.f1;
                             }
                         })
                 )
-                .keyBy(t->t.f0)
-                .process(new KeyedProcessFunction<String,Tuple2<String, Long>, String>() {
+                .keyBy(t -> t.f0)
+                .window(TumblingEventTimeWindows.of(Time.seconds(5)))
+                .process(new ProcessWindowFunction<Tuple2<String, Long>, String, String, TimeWindow>() {
                     @Override
-                    public void processElement(Tuple2<String, Long> value, Context ctx, Collector<String> out) throws Exception {
-                        long watermark = ctx.timerService().currentWatermark();
-                        //当前的水位线 = 上一个事件时间 - 5*1000 - 1
-                        out.collect("当前的水位线是"+new Timestamp(watermark));
-                        ctx.timerService().registerEventTimeTimer(value.f1+5000L);
-                        out.collect("注册了一个定时器："+new Timestamp(value.f1+5000L));
-                    }
-
-                    @Override
-                    public void onTimer(long timestamp, OnTimerContext ctx, Collector<String> out) throws Exception {
-                        super.onTimer(timestamp, ctx, out);
-                        out.collect("定时器触发了："+new Timestamp(timestamp));
+                    public void process(String s, Context context, Iterable<Tuple2<String, Long>> elements, Collector<String> out) throws Exception {
+                        long currentWatermark = context.currentWatermark();
+                        long start = context.window().getStart();
+                        long end = context.window().getEnd();
+                        out.collect("窗口触发，key:"+s+",当前水位线："+currentWatermark+",窗口开始时间："+start+",结束时间："+end);
                     }
                 })
                 .print();

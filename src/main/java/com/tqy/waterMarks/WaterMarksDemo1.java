@@ -14,6 +14,7 @@ import org.apache.flink.util.Collector;
 import java.sql.Timestamp;
 import java.time.Duration;
 
+//水位线滚动窗口
 public class WaterMarksDemo1 {
 
     public static void main(String[] args) throws Exception {
